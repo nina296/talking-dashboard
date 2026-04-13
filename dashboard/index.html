@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Talking Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0a0e1a;
+      color: #fff;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1a1f3a, #0d1b2a);
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid #00d4ff33;
+      box-shadow: 0 4px 20px #00d4ff22;
+    }
+    header h1 {
+      font-size: 26px;
+      background: linear-gradient(90deg, #00d4ff, #7b2ff7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 700;
+    }
+    .status-global {
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .status-ok { background: #00ff8822; color: #00ff88; border: 1px solid #00ff88; }
+    .status-critical { background: #ff003322; color: #ff4466; border: 1px solid #ff4466; animation: pulse 1s infinite; }
+    .status-warning { background: #ffaa0022; color: #ffaa00; border: 1px solid #ffaa00; }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 #ff446644; }
+      50% { box-shadow: 0 0 0 8px #ff446600; }
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-10px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .section-title {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #00d4ff;
+      margin: 30px 40px 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, #00d4ff44, transparent);
+    }
+
+    .servers-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      padding: 0 40px;
+    }
+
+    .server-card {
+      background: linear-gradient(135deg, #1a1f3a, #0f1628);
+      border-radius: 16px;
+      padding: 24px;
+      border: 1px solid #ffffff11;
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+    .server-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: 16px 16px 0 0;
+    }
+    .server-card.online::before { background: linear-gradient(90deg, #00ff88, #00d4ff); }
+    .server-card.offline::before { background: linear-gradient(90deg, #ff4466, #ff0033); animation: blink 1s infinite; }
+    .server-card.warning::before { background: linear-gradient(90deg, #ffaa00, #ff6600); }
+    .server-card:hover { transform: translateY(-3px); box-shadow: 0 10px 30px #00d4ff22; }
+
+    .server-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .server-name { font-size: 18px; font-weight: 700; color: #fff; }
+
+    .badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .badge-online { background: #00ff8822; color: #00ff88; border: 1px solid #00ff8866; }
+    .badge-offline { background: #ff446622; color: #ff4466; border: 1px solid #ff446666; animation: blink 1s infinite; }
+    .badge-warning { background: #ffaa0022; color: #ffaa00; border: 1px solid #ffaa0066; }
+
+    .metric { margin-bottom: 14px; }
+    .metric-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 12px;
+      color: #8892b0;
+    }
+    .metric-val { font-weight: bold; color: #fff; }
+    .bar-bg { background: #ffffff11; border-radius: 6px; height: 6px; overflow: hidden; }
+    .bar { height: 6px; border-radius: 6px; transition: width 0.8s ease; }
+    .bar-ok { background: linear-gradient(90deg, #00ff88, #00d4ff); }
+    .bar-warning { background: linear-gradient(90deg, #ffaa00, #ff6600); }
+    .bar-critical { background: linear-gradient(90deg, #ff4466, #ff0033); }
+
+    .offline-overlay {
+      text-align: center;
+      padding: 20px 0;
+      color: #ff4466;
+      font-size: 15px;
+      font-weight: bold;
+    }
+    .offline-icon {
+      font-size: 40px;
+      margin-bottom: 8px;
+      animation: blink 1s infinite;
+    }
+
+    .alerts-container {
+      margin: 0 40px;
+      background: linear-gradient(135deg, #1a1f3a, #0f1628);
+      border-radius: 16px;
+      border: 1px solid #ffffff11;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+    .alert-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 20px;
+      border-bottom: 1px solid #ffffff08;
+      font-size: 14px;
+      animation: slideIn 0.3s ease;
+    }
+    .alert-item:last-child { border-bottom: none; }
+    .alert-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot-critical { background: #ff4466; box-shadow: 0 0 6px #ff4466; animation: pulse 1s infinite; }
+    .dot-warning { background: #ffaa00; box-shadow: 0 0 6px #ffaa00; }
+    .dot-ok { background: #00ff88; box-shadow: 0 0 6px #00ff88; }
+    .alert-time { margin-left: auto; color: #8892b0; font-size: 12px; white-space: nowrap; }
+    .no-alert { padding: 20px; text-align: center; color: #8892b0; font-size: 14px; }
+
+    .vocal-section {
+      margin: 20px 40px 40px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .btn-vocal {
+      padding: 14px 32px;
+      background: linear-gradient(135deg, #7b2ff7, #00d4ff);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .btn-vocal:hover { transform: scale(1.05); box-shadow: 0 8px 25px #7b2ff755; }
+    .btn-vocal:active { transform: scale(0.98); }
+
+    .vocal-status {
+      padding: 10px 20px;
+      background: #ffffff08;
+      border-radius: 10px;
+      font-size: 13px;
+      color: #8892b0;
+      border: 1px solid #ffffff11;
+    }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #00d4ff44; border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Talking Dashboard</h1>
+  <div style="display:flex;align-items:center;gap:16px">
+    <span style="color:#8892b0;font-size:13px" id="last-update">--</span>
+    <div class="status-global status-ok" id="global-status">Systeme OK</div>
+  </div>
+</header>
+
+<div class="section-title">Serveurs surveilles</div>
+<div class="servers-grid" id="servers-grid"></div>
+
+<div class="section-title">Historique des alertes</div>
+<div class="alerts-container" id="alerts-container">
+  <div class="no-alert" id="no-alert">Aucune alerte — tous les systemes sont operationnels</div>
+</div>
+
+<div class="section-title">Controle vocal</div>
+<div class="vocal-section">
+  <button class="btn-vocal" onclick="testVoice()">Tester l'alerte vocale</button>
+  <div class="vocal-status">
+    Service vocal : <span id="vocal-state" style="color:#ffaa00">verification...</span>
+  </div>
+</div>
+
+<script>
+  const PROMETHEUS = 'http://localhost:9090';
+  const VOCAL_APP  = 'http://localhost:5000';
+
+  const SERVERS = [
+    { name: 'Server-1', instance: 'server-1:9100' },
+    { name: 'Server-2', instance: 'server-2:9100' },
+    { name: 'Server-3', instance: 'server-3:9100' },
+  ];
+
+  let alertHistory = [];
+  const serverStates = {};
+
+  async function queryPrometheus(expr) {
+    try {
+      const res = await fetch(`${PROMETHEUS}/api/v1/query?query=${encodeURIComponent(expr)}`);
+      const json = await res.json();
+      return json.data.result;
+    } catch { return []; }
+  }
+
+  function getBarClass(val) {
+    if (val > 80) return 'bar-critical';
+    if (val > 60) return 'bar-warning';
+    return 'bar-ok';
+  }
+
+  function formatBytes(bytes) {
+    if (!bytes) return 'N/A';
+    const kb = parseFloat(bytes) / 1024;
+    if (kb > 1024) return (kb / 1024).toFixed(1) + ' MB/s';
+    return kb.toFixed(1) + ' KB/s';
+  }
+
+  function buildServerCard(server, online, cpu, ram, disk, netRx, netTx) {
+    const card = document.getElementById('card-' + server.name);
+
+    if (!online) {
+      card.className = 'server-card offline';
+      card.innerHTML = `
+        <div class="server-header">
+          <div>
+            <div class="server-name">${server.name}</div>
+            <div style="font-size:11px;color:#8892b0;margin-top:4px">${server.instance}</div>
+          </div>
+          <span class="badge badge-offline">Hors ligne</span>
+        </div>
+        <div class="offline-overlay">
+          <div class="offline-icon">!</div>
+          <div>Serveur inaccessible</div>
+          <div style="font-size:12px;color:#8892b0;margin-top:6px">Alerte vocale declenchee</div>
+        </div>`;
+      return;
+    }
+
+    const cpuVal  = cpu  !== null ? parseFloat(cpu).toFixed(1)  : null;
+    const ramVal  = ram  !== null ? parseFloat(ram).toFixed(1)  : null;
+    const diskVal = disk !== null ? parseFloat(disk).toFixed(1) : null;
+    const hasWarning = (cpuVal > 80) || (ramVal > 80) || (diskVal > 85);
+
+    card.className = 'server-card ' + (hasWarning ? 'warning' : 'online');
+    card.innerHTML = `
+      <div class="server-header">
+        <div>
+          <div class="server-name">${server.name}</div>
+          <div style="font-size:11px;color:#8892b0;margin-top:4px">${server.instance}</div>
+        </div>
+        <span class="badge ${hasWarning ? 'badge-warning' : 'badge-online'}">${hasWarning ? 'Warning' : 'En ligne'}</span>
+      </div>
+      <div class="metric">
+        <div class="metric-header"><span>CPU</span><span class="metric-val">${cpuVal !== null ? cpuVal + '%' : 'N/A'}</span></div>
+        <div class="bar-bg"><div class="bar ${getBarClass(cpuVal)}" style="width:${cpuVal || 0}%"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-header"><span>RAM</span><span class="metric-val">${ramVal !== null ? ramVal + '%' : 'N/A'}</span></div>
+        <div class="bar-bg"><div class="bar ${getBarClass(ramVal)}" style="width:${ramVal || 0}%"></div></div>
+      </div>
+      <div class="metric">
+        <div class="metric-header"><span>Disque</span><span class="metric-val">${diskVal !== null ? diskVal + '%' : 'N/A'}</span></div>
+        <div class="bar-bg"><div class="bar ${getBarClass(diskVal)}" style="width:${diskVal || 0}%"></div></div>
+      </div>
+      <div style="display:flex;gap:16px;margin-top:14px;padding-top:14px;border-top:1px solid #ffffff11">
+        <div style="flex:1;text-align:center">
+          <div style="font-size:11px;color:#8892b0;margin-bottom:4px">Reseau RX</div>
+          <div style="font-size:13px;color:#00d4ff;font-weight:bold">${formatBytes(netRx)}</div>
+        </div>
+        <div style="flex:1;text-align:center">
+          <div style="font-size:11px;color:#8892b0;margin-bottom:4px">Reseau TX</div>
+          <div style="font-size:13px;color:#7b2ff7;font-weight:bold">${formatBytes(netTx)}</div>
+        </div>
+      </div>`;
+  }
+
+  function addAlert(msg, severity) {
+    const time = new Date().toLocaleTimeString();
+    alertHistory.unshift({ msg, severity, time });
+    if (alertHistory.length > 20) alertHistory.pop();
+    const container = document.getElementById('alerts-container');
+    document.getElementById('no-alert')?.remove();
+    container.innerHTML = alertHistory.map(a => `
+      <div class="alert-item">
+        <div class="alert-dot dot-${a.severity}"></div>
+        <span>${a.msg}</span>
+        <span class="alert-time">${a.time}</span>
+      </div>`).join('');
+  }
+
+  async function updateDashboard() {
+    const upResults    = await queryPrometheus('up{job="servers"}');
+    const cpuResults   = await queryPrometheus('100 - (avg by(instance)(rate(node_cpu_seconds_total{mode="idle",job="servers"}[2m])) * 100)');
+    const ramResults   = await queryPrometheus('(1 - (node_memory_MemAvailable_bytes{job="servers"} / node_memory_MemTotal_bytes{job="servers"})) * 100');
+    const diskResults  = await queryPrometheus('(1 - (node_filesystem_avail_bytes{job="servers",fstype!="tmpfs",fstype!="overlay"} / node_filesystem_size_bytes{job="servers",fstype!="tmpfs",fstype!="overlay"})) * 100');
+    const netRxResults = await queryPrometheus('rate(node_network_receive_bytes_total{job="servers",device!="lo"}[2m])');
+    const netTxResults = await queryPrometheus('rate(node_network_transmit_bytes_total{job="servers",device!="lo"}[2m])');
+
+    const upMap    = {};
+    const cpuMap   = {};
+    const ramMap   = {};
+    const diskMap  = {};
+    const netRxMap = {};
+    const netTxMap = {};
+
+    upResults.forEach(r    => upMap[r.metric.instance]    = r.value[1]);
+    cpuResults.forEach(r   => cpuMap[r.metric.instance]   = r.value[1]);
+    ramResults.forEach(r   => ramMap[r.metric.instance]   = r.value[1]);
+    diskResults.forEach(r  => diskMap[r.metric.instance]  = r.value[1]);
+    netRxResults.forEach(r => netRxMap[r.metric.instance] = r.value[1]);
+    netTxResults.forEach(r => netTxMap[r.metric.instance] = r.value[1]);
+
+    let anyOffline = false;
+    let anyWarning = false;
+
+    SERVERS.forEach(server => {
+      const online = upMap[server.instance] === '1';
+      const cpu    = cpuMap[server.instance]   || null;
+      const ram    = ramMap[server.instance]   || null;
+      const disk   = diskMap[server.instance]  || null;
+      const netRx  = netRxMap[server.instance] || null;
+      const netTx  = netTxMap[server.instance] || null;
+
+      const prevState = serverStates[server.name];
+
+      if (!online) {
+        anyOffline = true;
+        if (prevState !== 'offline') {
+          serverStates[server.name] = 'offline';
+          if (prevState !== undefined) {
+            addAlert(`${server.name} est hors ligne !`, 'critical');
+            notifyVoice(server.name);
+          }
+        }
+      } else {
+        if (prevState === 'offline') {
+          serverStates[server.name] = 'online';
+          addAlert(`${server.name} est de nouveau en ligne — incident resolu`, 'ok');
+          notifyResolved(server.name);
+        } else {
+          serverStates[server.name] = 'online';
+        }
+        if (cpu > 80 || ram > 80 || disk > 85) anyWarning = true;
+      }
+
+      buildServerCard(server, online, cpu, ram, disk, netRx, netTx);
+    });
+
+    const globalEl = document.getElementById('global-status');
+    if (anyOffline) {
+      globalEl.className = 'status-global status-critical';
+      globalEl.textContent = 'Incident detecte';
+    } else if (anyWarning) {
+      globalEl.className = 'status-global status-warning';
+      globalEl.textContent = 'Avertissement';
+    } else {
+      globalEl.className = 'status-global status-ok';
+      globalEl.textContent = 'Systeme OK';
+    }
+
+    document.getElementById('last-update').textContent =
+      'Mis a jour : ' + new Date().toLocaleTimeString();
+  }
+
+  async function notifyVoice(serverName) {
+    try {
+      await fetch(`${VOCAL_APP}/alert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          alerts: [{
+            labels: { alertname: 'ServeurHorsLigne', severity: 'critical' },
+            annotations: {
+              summary: `${serverName} est hors ligne`,
+              description: `Le ${serverName} ne repond plus. Intervention requise.`
+            }
+          }]
+        })
+      });
+    } catch(e) { console.log('Vocal app non disponible'); }
+  }
+
+  async function notifyResolved(serverName) {
+    try {
+      await fetch(`${VOCAL_APP}/resolved`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ server: serverName })
+      });
+    } catch(e) { console.log('Vocal app non disponible'); }
+  }
+
+  async function testVoice() {
+    try {
+      const res = await fetch(`${VOCAL_APP}/test`);
+      if (res.ok) {
+        addAlert('Test vocal envoye avec succes', 'ok');
+        document.getElementById('vocal-state').textContent = 'connecte';
+        document.getElementById('vocal-state').style.color = '#00ff88';
+      }
+    } catch {
+      addAlert('Service vocal non disponible — lance python app.py', 'critical');
+      document.getElementById('vocal-state').textContent = 'non disponible';
+      document.getElementById('vocal-state').style.color = '#ff4466';
+    }
+  }
+
+  async function checkVocalService() {
+    try {
+      await fetch(`${VOCAL_APP}/health`);
+      document.getElementById('vocal-state').textContent = 'connecte';
+      document.getElementById('vocal-state').style.color = '#00ff88';
+    } catch {
+      document.getElementById('vocal-state').textContent = 'non disponible';
+      document.getElementById('vocal-state').style.color = '#ff4466';
+    }
+  }
+
+  const grid = document.getElementById('servers-grid');
+  SERVERS.forEach(s => {
+    const div = document.createElement('div');
+    div.id = 'card-' + s.name;
+    div.className = 'server-card';
+    div.innerHTML = `<div style="color:#8892b0;text-align:center;padding:20px">Chargement...</div>`;
+    grid.appendChild(div);
+  });
+
+  checkVocalService();
+  updateDashboard();
+  setInterval(updateDashboard, 10000);
+  setInterval(checkVocalService, 30000);
+</script>
+</body>
+</html>
